@@ -10,17 +10,21 @@ use Throwable;
 
 /**
  * 对topthink/think-queue队列的封装
+ * - 返回true，表示任务执行成功，会删除当前任务
+ * - 抛出异常时，会根据attempts参数，决定是重试还是删除任务
+ * @link https://github.com/top-think/think-queue
  */
 trait Jobs
 {
     /**
      * 重试间隔
+     * - 单位：秒
      * @var int
      */
     protected static int $retry_seconds = 5;
 
     /**
-     * 抽象方法
+     * 抽象方法，子类必须实现
      * - 返回true，表示任务执行成功，会删除当前任务
      * - 抛出异常时，会根据attempts参数，决定是重试还是删除任务
      * @return bool|null
@@ -30,10 +34,10 @@ trait Jobs
     /**
      * topthink/think-queue默认执行的方法
      * @param Job $job
-     * @param mixed $payload
+     * @param array $payload
      * @return void
      */
-    final public function fire(Job $job, mixed $payload): void
+    final public function fire(Job $job, array $payload): void
     {
         $jobs = $payload['job'] ?? '';
         $data = $payload['args'] ?? null;
@@ -110,16 +114,16 @@ trait Jobs
 
     /**
      * 调度任务
-     * - 可以执行任意类方法
+     * - 可以执行任意类公共方法
      * @param array $callable 可调用数组
      * @param mixed $args 参数
      * @param int $delay 延时时间
      * @param int $attempts 重试次数
-     * @param string|null $queue 队列名称
      * @param array $constructor 构造函数参数
+     * @param string|null $queue 队列名称
      * @return void
      */
-    final public static function emit(array $callable, mixed $args = null, int $delay = 0, int $attempts = 0, string $queue = null, array $constructor = []): void
+    final public static function emit(array $callable, mixed $args, int $delay = 0, int $attempts = 0, array $constructor = [], string $queue = null): void
     {
         if (2 !== count($callable)) {
             throw new RuntimeException('参数callable错误');
@@ -140,5 +144,15 @@ trait Jobs
         } else {
             Queue::push(static::class, $payload, $queue);
         }
+    }
+
+    /**
+     * 任务失败执行的方法
+     * @param array $data 发布任务时自定义的数据
+     * @return void
+     */
+    public function failed(mixed $data)
+    {
+        // ...任务达到最大重试次数后，失败了
     }
 }
