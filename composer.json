@@ -1,0 +1,21 @@
+{
+    "name": "ledc/think-queue",
+    "type": "library",
+    "license": "MIT",
+    "description": "think-queue for ThinkPHP6",
+    "autoload": {
+        "psr-4": {
+            "Ledc\\ThinkQueue\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "david",
+            "email": "nz1985@qq.com"
+        }
+    ],
+    "require": {
+        "php": ">=8.1",
+        "topthink/think-queue": "^3.0"
+    }
+}
