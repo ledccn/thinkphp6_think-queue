@@ -15,10 +15,10 @@ trait Builder
     /**
      * topthink/think-queue默认执行的方法
      * @param Job $job 任务对象
-     * @param array $data 消息内容
+     * @param mixed $data 消息内容
      * @return void
      */
-    abstract public function fire(Job $job, array $data): void;
+    abstract public function fire(Job $job, mixed $data): void;
 
     /**
      * 任务名与消费者类的映射关系
