@@ -2,4 +2,4 @@
 
 ## 安装
 
-> composer require ledc/think-queue
+`composer require ledc/think-queue`

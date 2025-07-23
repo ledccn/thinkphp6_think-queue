@@ -21,7 +21,7 @@ trait Jobs
      * - 单位：秒
      * @var int
      */
-    protected static int $retry_seconds = 5;
+    protected int $retry_seconds = 5;
 
     /**
      * 抽象方法，子类必须实现
@@ -40,7 +40,7 @@ trait Jobs
     final public function fire(Job $job, array $payload): void
     {
         $jobs = $payload['job'] ?? '';
-        $data = $payload['args'] ?? null;
+        $args = $payload['args'] ?? null;
         $constructor = $payload['constructor'] ?? [];
         $attempts = $payload['attempts'] ?? 0;
         if (empty($jobs)) {
@@ -50,31 +50,45 @@ trait Jobs
         try {
             list($class, $method) = self::parseJob($jobs);
             $instance = $constructor ? (new $class(... array_values($constructor))) : (new $class);
-            if (method_exists($instance, $method)) {
-                if ($data && is_array($data)) {
-                    // 非空数组
-                    $result = $instance->{$method}(... array_values($data));
+            if (!method_exists($instance, $method)) {
+                $job->delete();
+                return;
+            }
+            if (is_array($args)) {
+                if ($args) {
+                    // 非空数组，支持命名参数
+                    $result = call_user_func_array([$instance, $method], $args);
                 } else {
-                    // null/int/bool/string/空数组
-                    $result = $instance->{$method}($data);
-                }
-                if (true === $result || !$attempts) {
-                    $job->delete();
-                    return;
+                    $result = $instance->{$method}();
                 }
             } else {
+                // null/int/bool/string/空数组
+                $result = $instance->{$method}($args);
+            }
+            if ($result) {
                 $job->delete();
+                return;
             }
         } catch (Throwable $throwable) {
             Log::error('think-queue执行异常' . $throwable->getMessage());
         }
 
-        if ($job->attempts() >= $attempts) {
-            $job->delete();
+        // 重试或删除任务
+        if ($attempts && 0 < $attempts && $job->attempts() < $attempts) {
+            $job->release($job->attempts() * max(3, $this->getRetrySeconds()));
         } else {
-            $retry_seconds = max(1, static::$retry_seconds);
-            $job->release($job->attempts() * $retry_seconds);
+            $job->delete();
         }
+    }
+
+    /**
+     * 获取重试间隔时间
+     * - 单位：秒
+     * @return int
+     */
+    public function getRetrySeconds(): int
+    {
+        return $this->retry_seconds;
     }
 
     /**
@@ -98,7 +112,7 @@ trait Jobs
      * @param string|null $queue 队列名称
      * @return void
      */
-    final public static function dispatch(mixed $args, int $delay = 0, int $attempts = 0, string $queue = null): void
+    final public static function dispatch(mixed $args, int $delay = 0, int $attempts = 3, string $queue = null): void
     {
         $payload = [
             'job' => static::class . '@execute',
@@ -123,7 +137,7 @@ trait Jobs
      * @param string|null $queue 队列名称
      * @return void
      */
-    final public static function emit(array $callable, mixed $args, int $delay = 0, int $attempts = 0, array $constructor = [], string $queue = null): void
+    final public static function emit(array $callable, mixed $args, int $delay = 0, int $attempts = 3, array $constructor = [], string $queue = null): void
     {
         if (2 !== count($callable)) {
             throw new RuntimeException('参数callable错误');
